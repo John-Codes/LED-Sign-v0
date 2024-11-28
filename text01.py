@@ -19,7 +19,6 @@ LED_CHANNEL = 0
 
 def signal_handler(sig, frame):
     print('\nStopping animation...')
-    controller = TextDisplayController()
     controller.clear_display()
     sys.exit(0)
 
@@ -43,13 +42,11 @@ class TextDisplayController:
         if not (0 <= x < self.DISPLAY_WIDTH and 0 <= y < self.DISPLAY_HEIGHT):
             return -1
             
-        local_x = x % self.PANEL_WIDTH
-        local_y = y % self.PANEL_HEIGHT
+        # Flip the x coordinate within each panel, but keep panel order
         panel_x = x // self.PANEL_WIDTH
         panel_y = y // self.PANEL_HEIGHT
-        
-        # Swap panel order within each row (0->1, 1->0)
-        panel_x = 1 - panel_x
+        local_x = (self.PANEL_WIDTH - 1) - (x % self.PANEL_WIDTH)
+        local_y = y % self.PANEL_HEIGHT
         
         if local_y % 2 == 1:
             local_x = self.PANEL_WIDTH - 1 - local_x
