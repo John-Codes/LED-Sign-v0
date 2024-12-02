@@ -19,6 +19,52 @@ LED_BRIGHTNESS = 50
 LED_INVERT = False
 LED_CHANNEL = 0
 
+class Planet:
+    def __init__(self, display_width, display_height):
+        edge = random.choice(['top', 'left', 'right', 'bottom'])
+        if edge == 'top':
+            self.initial_x = random.randint(0, display_width)
+            self.initial_y = -5
+        elif edge == 'left':
+            self.initial_x = -5
+            self.initial_y = random.randint(0, display_height)
+        elif edge == 'right':
+            self.initial_x = display_width + 5
+            self.initial_y = random.randint(0, display_height)
+        else:  # bottom
+            self.initial_x = random.randint(0, display_width)
+            self.initial_y = display_height + 5
+            
+        self.x = self.initial_x
+        self.y = self.initial_y
+        self.speed = 0.5 + random.random() * 2
+        self.angle = random.random() * 2 * math.pi
+        self.size = random.randint(1, 5)
+        self.life = 0
+        self.max_life = display_width * 3
+        
+        planet_types = [
+            (0.0, 1.0, 1.0),    # Red
+            (0.1, 0.8, 0.9),    # Orange
+            (0.3, 0.7, 1.0),    # Green
+            (0.6, 0.9, 0.8),    # Blue
+            (0.8, 0.7, 0.9),    # Purple
+            (0.95, 0.6, 1.0),   # Pink
+            (random.random(), 0.8 + random.random() * 0.2, 0.6 + random.random() * 0.4)  # Random
+        ]
+        
+        self.hue, self.saturation, self.value = random.choice(planet_types)
+        self.color = tuple(int(c * 255) for c in colorsys.hsv_to_rgb(self.hue, self.saturation, self.value))
+        
+        self.glow_size = self.size + random.randint(1, 3)
+        self.glow_brightness = 0.3 + random.random() * 0.4
+
+    def update(self):
+        self.life += self.speed
+        self.x = self.initial_x + math.cos(self.angle) * self.life
+        self.y = self.initial_y + math.sin(self.angle) * self.life
+        return not (self.life > self.max_life)
+
 class Star:
     def __init__(self, x, y, brightness, star_type='primary'):
         self.x = x
@@ -92,14 +138,17 @@ class StarController:
         
         self.stars = []
         self.shooting_stars = []
+        self.planets = []
         self.last_shooting_star = 0
+        self.last_planet = 0
         self.shooting_star_interval = 0.5
+        self.planet_interval = 2.0
         self.max_shooting_stars = 5
+        self.max_planets = 8
         
         self.background_phase = 0
         self.background_speed = 0.1
         
-        # Intensity map for background
         self.intensity_map = np.ones((self.DISPLAY_HEIGHT, self.DISPLAY_WIDTH))
         self.init_stars(80)
 
@@ -129,26 +178,26 @@ class StarController:
         if len(self.shooting_stars) < self.max_shooting_stars:
             self.shooting_stars.append(star)
 
+    def add_planet(self):
+        if len(self.planets) < self.max_planets and random.random() < 0.4:
+            self.planets.append(Planet(self.DISPLAY_WIDTH, self.DISPLAY_HEIGHT))
+            self.last_planet = time.time()
+
     def update_intensity_map(self):
-        # Random dimming
         for y in range(self.DISPLAY_HEIGHT):
             for x in range(self.DISPLAY_WIDTH):
-                if random.random() < 0.001:  # 0.1% chance per pixel
+                if random.random() < 0.001:
                     self.intensity_map[y, x] = random.random() * 0.5
                 else:
-                    # Gradually restore intensity
                     self.intensity_map[y, x] = min(1.0, self.intensity_map[y, x] + 0.01)
 
     def get_background_color(self, x, y, t):
-        # Base color cycle
         hue = (math.sin(t * 0.1) + 1) / 2
         wave = math.sin(self.background_phase + t * self.background_speed)
         base_intensity = (wave + 1) * 0.5 * 0.15
         
-        # Apply intensity map
         intensity = base_intensity * self.intensity_map[y, x]
         
-        # Convert HSV to RGB
         rgb = colorsys.hsv_to_rgb(hue, 0.8, intensity)
         return tuple(int(c * 255) for c in rgb)
 
@@ -205,10 +254,34 @@ class StarController:
                     color = tuple(int(c * trail_brightness) for c in (r, g, b))
                     self.strip.setPixelColor(pixel_index, Color(*color))
 
+        self.planets = [planet for planet in self.planets if planet.update()]
+        
+        for planet in self.planets:
+            for gx in range(int(planet.x - planet.glow_size), int(planet.x + planet.glow_size + 1)):
+                for gy in range(int(planet.y - planet.glow_size), int(planet.y + planet.glow_size + 1)):
+                    distance = math.sqrt((gx - planet.x)**2 + (gy - planet.y)**2)
+                    if distance <= planet.glow_size:
+                        brightness = (planet.glow_size - distance) / planet.glow_size * planet.glow_brightness
+                        color = tuple(int(c * brightness) for c in planet.color)
+                        pixel_index = self.get_pixel_index(gx, gy)
+                        if pixel_index >= 0:
+                            self.strip.setPixelColor(pixel_index, Color(*color))
+            
+            for dx in range(-planet.size, planet.size + 1):
+                for dy in range(-planet.size, planet.size + 1):
+                    if dx*dx + dy*dy <= planet.size*planet.size:
+                        pixel_index = self.get_pixel_index(int(planet.x + dx), int(planet.y + dy))
+                        if pixel_index >= 0:
+                            self.strip.setPixelColor(pixel_index, Color(*planet.color))
+
         if t - self.last_shooting_star > self.shooting_star_interval:
             if random.random() < 0.6:
                 self.add_shooting_star()
                 self.last_shooting_star = t
+
+        current_time = time.time()
+        if current_time - self.last_planet > self.planet_interval:
+            self.add_planet()
 
         self.strip.show()
 

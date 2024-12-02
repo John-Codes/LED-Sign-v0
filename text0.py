@@ -27,47 +27,6 @@ LED_BRIGHTNESS = 5
 LED_INVERT = False
 LED_CHANNEL = 0
 
-class Star:
-    def __init__(self, x, y, brightness=1.0, speed=1.0):
-        self.x = x
-        self.y = y
-        self.brightness = brightness
-        self.speed = speed
-        self.color = self.random_color()
-
-    def random_color(self):
-        colors = [
-            (255, 255, 200),  # Warm white
-            (200, 200, 255),  # Cool white
-            (255, 200, 200),  # Pink
-            (200, 255, 200),  # Mint
-        ]
-        return random.choice(colors)
-
-    def update(self, t):
-        self.brightness = (math.sin(t * self.speed) + 1) / 2
-
-    def get_color(self):
-        return tuple(int(c * self.brightness) for c in self.color)
-
-class StarAnimation:
-    def __init__(self, width, height, num_stars=30):
-        self.width = width
-        self.height = height
-        self.stars = []
-        for _ in range(num_stars):
-            x = random.randint(0, width-1)
-            y = random.randint(0, height-1)
-            speed = random.uniform(1.0, 3.0)
-            self.stars.append(Star(x, y, speed=speed))
-
-    def render(self, t):
-        frame = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-        for star in self.stars:
-            star.update(t)
-            color = star.get_color()
-            frame[star.y, star.x] = color
-        return frame
 
 class TextDisplayController:
     def __init__(self):
@@ -204,7 +163,7 @@ class TextDisplayController:
             for offset in range(total_height - self.DISPLAY_HEIGHT, -1, -1):
                 window = img_array[offset:offset + self.DISPLAY_HEIGHT]
                 self.display_frame_animated(window, 0, animation_time)
-                time.sleep(scroll_speed)
+                #time.sleep(scroll_speed)
                 animation_time += scroll_speed
         except Exception as e:
             print(f"Error while scrolling: {e}")
@@ -246,7 +205,7 @@ class TextDisplayController:
             time.sleep(0.05)
             animation_time += 0.05
 
-    def display_sequence_animated(self, words, scroll_speed=0.05, pause_time=1.0):
+    def display_sequence_animated(self, words, scroll_speed=0.05, pause_time=0):
         try:
             while True:
                 for word in words:
@@ -258,7 +217,7 @@ class TextDisplayController:
                     else:
                         self.display_static_text(word)
                     
-                    self.display_star_animation(duration=2.0)
+                   
                     time.sleep(pause_time)
                     
         except KeyboardInterrupt:
